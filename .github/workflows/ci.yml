@@ -1,0 +1,48 @@
+name: CI
+
+# The crate and the test modules, checked and built for both targets. The
+# GPU tests in tests/gpu.rs need the ffrwd sidecar and a GPU, so they skip
+# here; they run where FFRWD_WASM names a sidecar.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-wasip2
+          components: clippy, rustfmt
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            .
+            tests/modules
+
+      - name: Format
+        run: |
+          cargo fmt --check
+          cargo fmt --all --check --manifest-path tests/modules/Cargo.toml
+
+      - name: Clippy, native
+        run: cargo clippy --all-targets -- -D warnings
+
+      - name: Clippy, wasm32-wasip2
+        run: |
+          cargo clippy --target wasm32-wasip2 -- -D warnings
+          cargo clippy --release --target wasm32-wasip2 --manifest-path tests/modules/Cargo.toml -- -D warnings
+
+      - name: Build for wasm32-wasip2
+        run: |
+          cargo build --target wasm32-wasip2 --release
+          cargo build --target wasm32-wasip2 --release --manifest-path tests/modules/Cargo.toml
+
+      - name: Test
+        run: cargo test
