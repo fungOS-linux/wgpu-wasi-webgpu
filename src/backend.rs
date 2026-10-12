@@ -103,7 +103,10 @@ pub struct Adapter {
 }
 
 impl AdapterInterface for Adapter {
-    fn request_device(&self, desc: &wgt::DeviceDescriptor<'_>) -> Pin<Box<dyn RequestDeviceFuture>> {
+    fn request_device(
+        &self,
+        desc: &wgt::DeviceDescriptor<'_>,
+    ) -> Pin<Box<dyn RequestDeviceFuture>> {
         let names: Vec<w::GpuFeatureName> = conv::FEATURES
             .iter()
             .filter(|(_, flag)| desc.required_features.contains(*flag))
@@ -134,7 +137,10 @@ impl AdapterInterface for Adapter {
             queue,
             submissions: Cell::new(0),
         };
-        Box::pin(ready(Ok((DispatchDevice::custom(device), DispatchQueue::custom(queue)))))
+        Box::pin(ready(Ok((
+            DispatchDevice::custom(device),
+            DispatchQueue::custom(queue),
+        ))))
     }
 
     fn is_surface_supported(&self, _surface: &DispatchSurface) -> bool {
@@ -157,7 +163,10 @@ impl AdapterInterface for Adapter {
         conv::adapter_info(&self.adapter.info())
     }
 
-    fn get_texture_format_features(&self, _format: wgt::TextureFormat) -> wgt::TextureFormatFeatures {
+    fn get_texture_format_features(
+        &self,
+        _format: wgt::TextureFormat,
+    ) -> wgt::TextureFormatFeatures {
         wgt::TextureFormatFeatures {
             allowed_usages: wgt::TextureUsages::all(),
             flags: wgt::TextureFormatFeatureFlags::empty(),
@@ -215,11 +224,13 @@ impl DeviceInterface for Device {
             wgt::ShaderSource::Wgsl(code) => code.into_owned(),
             _ => todo!("wasi:webgpu: shader sources other than WGSL"),
         };
-        let module = self.device.create_shader_module(&w::GpuShaderModuleDescriptor {
-            code,
-            compilation_hints: None,
-            label: label(desc.label),
-        });
+        let module = self
+            .device
+            .create_shader_module(&w::GpuShaderModuleDescriptor {
+                code,
+                compilation_hints: None,
+                label: label(desc.label),
+            });
         DispatchShaderModule::custom(ShaderModule { module })
     }
 
@@ -230,8 +241,12 @@ impl DeviceInterface for Device {
         todo!("wasi:webgpu: passthrough shaders")
     }
 
-    fn create_bind_group_layout(&self, desc: &wgt::BindGroupLayoutDescriptor<'_>) -> DispatchBindGroupLayout {
-        let entries: Vec<w::GpuBindGroupLayoutEntry> = desc.entries.iter().map(conv::layout_entry).collect();
+    fn create_bind_group_layout(
+        &self,
+        desc: &wgt::BindGroupLayoutDescriptor<'_>,
+    ) -> DispatchBindGroupLayout {
+        let entries: Vec<w::GpuBindGroupLayoutEntry> =
+            desc.entries.iter().map(conv::layout_entry).collect();
         let layout = self
             .device
             .create_bind_group_layout(&w::GpuBindGroupLayoutDescriptor {
@@ -280,22 +295,40 @@ impl DeviceInterface for Device {
         DispatchBindGroup::custom(BindGroup { group })
     }
 
-    fn create_pipeline_layout(&self, desc: &wgt::PipelineLayoutDescriptor<'_>) -> DispatchPipelineLayout {
+    fn create_pipeline_layout(
+        &self,
+        desc: &wgt::PipelineLayoutDescriptor<'_>,
+    ) -> DispatchPipelineLayout {
         let layouts: Vec<Option<&w::GpuBindGroupLayout>> = desc
             .bind_group_layouts
             .iter()
-            .map(|l| l.map(|l| &l.as_custom::<BindGroupLayout>().expect("bind group layout").layout))
+            .map(|l| {
+                l.map(|l| {
+                    &l.as_custom::<BindGroupLayout>()
+                        .expect("bind group layout")
+                        .layout
+                })
+            })
             .collect();
-        let layout = self.device.create_pipeline_layout(&w::GpuPipelineLayoutDescriptor {
-            bind_group_layouts: layouts,
-            label: label(desc.label),
-        });
+        let layout = self
+            .device
+            .create_pipeline_layout(&w::GpuPipelineLayoutDescriptor {
+                bind_group_layouts: layouts,
+                label: label(desc.label),
+            });
         DispatchPipelineLayout::custom(PipelineLayout { layout })
     }
 
-    fn create_render_pipeline(&self, desc: &wgt::RenderPipelineDescriptor<'_>) -> DispatchRenderPipeline {
+    fn create_render_pipeline(
+        &self,
+        desc: &wgt::RenderPipelineDescriptor<'_>,
+    ) -> DispatchRenderPipeline {
         let layout = match desc.layout {
-            Some(l) => w::GpuLayoutMode::Specific(&l.as_custom::<PipelineLayout>().expect("pipeline layout").layout),
+            Some(l) => w::GpuLayoutMode::Specific(
+                &l.as_custom::<PipelineLayout>()
+                    .expect("pipeline layout")
+                    .layout,
+            ),
             None => w::GpuLayoutMode::Auto,
         };
         let vertex_module: &ShaderModule = desc.vertex.module.as_custom().expect("shader module");
@@ -314,7 +347,11 @@ impl DeviceInterface for Device {
         let fragment = desc.fragment.as_ref().map(|f| {
             let module: &ShaderModule = f.module.as_custom().expect("shader module");
             w::GpuFragmentState {
-                targets: f.targets.iter().map(|t| t.as_ref().map(conv::color_target)).collect(),
+                targets: f
+                    .targets
+                    .iter()
+                    .map(|t| t.as_ref().map(conv::color_target))
+                    .collect(),
                 module: &module.module,
                 entry_point: f.entry_point.map(|s| s.to_string()),
                 constants: None,
@@ -333,41 +370,58 @@ impl DeviceInterface for Device {
             mask: Some(desc.multisample.mask as u32),
             alpha_to_coverage_enabled: Some(desc.multisample.alpha_to_coverage_enabled),
         };
-        let pipeline = self.device.create_render_pipeline(w::GpuRenderPipelineDescriptor {
-            vertex,
-            primitive: Some(primitive),
-            depth_stencil: desc.depth_stencil.as_ref().map(conv::depth_stencil),
-            multisample: Some(multisample),
-            fragment,
-            layout,
-            label: label(desc.label),
-        });
+        let pipeline = self
+            .device
+            .create_render_pipeline(w::GpuRenderPipelineDescriptor {
+                vertex,
+                primitive: Some(primitive),
+                depth_stencil: desc.depth_stencil.as_ref().map(conv::depth_stencil),
+                multisample: Some(multisample),
+                fragment,
+                layout,
+                label: label(desc.label),
+            });
         DispatchRenderPipeline::custom(RenderPipeline { pipeline })
     }
 
-    fn create_mesh_pipeline(&self, _desc: &wgt::MeshPipelineDescriptor<'_>) -> DispatchRenderPipeline {
+    fn create_mesh_pipeline(
+        &self,
+        _desc: &wgt::MeshPipelineDescriptor<'_>,
+    ) -> DispatchRenderPipeline {
         todo!("wasi:webgpu: mesh pipelines")
     }
 
-    fn create_compute_pipeline(&self, desc: &wgt::ComputePipelineDescriptor<'_>) -> DispatchComputePipeline {
+    fn create_compute_pipeline(
+        &self,
+        desc: &wgt::ComputePipelineDescriptor<'_>,
+    ) -> DispatchComputePipeline {
         let layout = match desc.layout {
-            Some(l) => w::GpuLayoutMode::Specific(&l.as_custom::<PipelineLayout>().expect("pipeline layout").layout),
+            Some(l) => w::GpuLayoutMode::Specific(
+                &l.as_custom::<PipelineLayout>()
+                    .expect("pipeline layout")
+                    .layout,
+            ),
             None => w::GpuLayoutMode::Auto,
         };
         let module: &ShaderModule = desc.module.as_custom().expect("shader module");
-        let pipeline = self.device.create_compute_pipeline(w::GpuComputePipelineDescriptor {
-            compute: w::GpuProgrammableStage {
-                module: &module.module,
-                entry_point: desc.entry_point.map(|s| s.to_string()),
-                constants: None,
-            },
-            layout,
-            label: label(desc.label),
-        });
+        let pipeline = self
+            .device
+            .create_compute_pipeline(w::GpuComputePipelineDescriptor {
+                compute: w::GpuProgrammableStage {
+                    module: &module.module,
+                    entry_point: desc.entry_point.map(|s| s.to_string()),
+                    constants: None,
+                },
+                layout,
+                label: label(desc.label),
+            });
         DispatchComputePipeline::custom(ComputePipeline { pipeline })
     }
 
-    unsafe fn create_pipeline_cache(&self, _desc: &wgt::PipelineCacheDescriptor<'_>) -> DispatchPipelineCache {
+    unsafe fn create_pipeline_cache(
+        &self,
+        _desc: &wgt::PipelineCacheDescriptor<'_>,
+    ) -> DispatchPipelineCache {
         todo!("wasi:webgpu: pipeline caches")
     }
 
@@ -393,7 +447,12 @@ impl DeviceInterface for Device {
             dimension: Some(conv::texture_dimension(desc.dimension)),
             format: conv::texture_format(desc.format),
             usage: desc.usage.bits(),
-            view_formats: Some(desc.view_formats.iter().map(|f| conv::texture_format(*f)).collect()),
+            view_formats: Some(
+                desc.view_formats
+                    .iter()
+                    .map(|f| conv::texture_format(*f))
+                    .collect(),
+            ),
             label: label(desc.label),
         });
         DispatchTexture::custom(Texture {
@@ -450,7 +509,10 @@ impl DeviceInterface for Device {
         DispatchQuerySet::custom(QuerySet { set })
     }
 
-    fn create_command_encoder(&self, desc: &wgt::CommandEncoderDescriptor<'_>) -> DispatchCommandEncoder {
+    fn create_command_encoder(
+        &self,
+        desc: &wgt::CommandEncoderDescriptor<'_>,
+    ) -> DispatchCommandEncoder {
         let encoder = self
             .device
             .create_command_encoder(Some(&w::GpuCommandEncoderDescriptor {
@@ -508,7 +570,10 @@ impl DeviceInterface for Device {
 
     unsafe fn stop_graphics_debugger_capture(&self) {}
 
-    fn poll(&self, _poll_type: wgpu::wgt::PollType<u64>) -> Result<wgt::PollStatus, wgt::PollError> {
+    fn poll(
+        &self,
+        _poll_type: wgpu::wgt::PollType<u64>,
+    ) -> Result<wgt::PollStatus, wgt::PollError> {
         // map-async blocks on this host, and submit returns when the host
         // has queued the work; there is nothing to drive.
         Ok(wgt::PollStatus::QueueEmpty)
@@ -648,7 +713,12 @@ pub struct Buffer {
 }
 
 impl BufferInterface for Buffer {
-    fn map_async(&self, mode: wgt::MapMode, range: Range<wgt::BufferAddress>, callback: BufferMapCallback) {
+    fn map_async(
+        &self,
+        mode: wgt::MapMode,
+        range: Range<wgt::BufferAddress>,
+        callback: BufferMapCallback,
+    ) {
         let (flags, write) = match mode {
             wgt::MapMode::Read => (1u32, false),
             wgt::MapMode::Write => (2u32, true),
@@ -712,7 +782,11 @@ impl Drop for MappedRange {
         if let Some((buffer, offset)) = self.write_back.take() {
             counters::up(self.data.len());
             buffer
-                .get_mapped_range_set_with_copy(&self.data, Some(offset), Some(self.data.len() as u64))
+                .get_mapped_range_set_with_copy(
+                    &self.data,
+                    Some(offset),
+                    Some(self.data.len() as u64),
+                )
                 .unwrap_or_else(|e| panic!("wasi:webgpu: get-mapped-range (write): {}", e.message));
         }
     }
@@ -887,8 +961,13 @@ impl CommandEncoderInterface for CommandEncoder {
         let src: &Buffer = custom!(source, Buffer);
         let dst: &Buffer = custom!(destination, Buffer);
         let size = copy_size.unwrap_or(src.size - source_offset);
-        self.encoder
-            .copy_buffer_to_buffer(&src.buffer, source_offset, &dst.buffer, destination_offset, size);
+        self.encoder.copy_buffer_to_buffer(
+            &src.buffer,
+            source_offset,
+            &dst.buffer,
+            destination_offset,
+            size,
+        );
     }
 
     fn copy_buffer_to_texture(
@@ -931,15 +1010,20 @@ impl CommandEncoderInterface for CommandEncoder {
     }
 
     fn begin_compute_pass(&self, desc: &wgt::ComputePassDescriptor<'_>) -> DispatchComputePass {
-        let timestamp_writes = desc.timestamp_writes.as_ref().map(|t| w::GpuComputePassTimestampWrites {
-            query_set: &t.query_set.as_custom::<QuerySet>().expect("query set").set,
-            beginning_of_pass_write_index: t.beginning_of_pass_write_index,
-            end_of_pass_write_index: t.end_of_pass_write_index,
-        });
-        let pass = self.encoder.begin_compute_pass(Some(&w::GpuComputePassDescriptor {
-            timestamp_writes,
-            label: label(desc.label),
-        }));
+        let timestamp_writes =
+            desc.timestamp_writes
+                .as_ref()
+                .map(|t| w::GpuComputePassTimestampWrites {
+                    query_set: &t.query_set.as_custom::<QuerySet>().expect("query set").set,
+                    beginning_of_pass_write_index: t.beginning_of_pass_write_index,
+                    end_of_pass_write_index: t.end_of_pass_write_index,
+                });
+        let pass = self
+            .encoder
+            .begin_compute_pass(Some(&w::GpuComputePassDescriptor {
+                timestamp_writes,
+                label: label(desc.label),
+            }));
         DispatchComputePass::custom(ComputePass { pass, ended: false })
     }
 
@@ -949,7 +1033,11 @@ impl CommandEncoderInterface for CommandEncoder {
             .iter()
             .map(|a| {
                 a.as_ref().map(|a| w::GpuRenderPassColorAttachment {
-                    view: &a.view.as_custom::<TextureView>().expect("texture view").view,
+                    view: &a
+                        .view
+                        .as_custom::<TextureView>()
+                        .expect("texture view")
+                        .view,
                     depth_slice: a.depth_slice,
                     resolve_target: a
                         .resolve_target
@@ -965,7 +1053,11 @@ impl CommandEncoderInterface for CommandEncoder {
             .collect();
         let depth_stencil_attachment = desc.depth_stencil_attachment.as_ref().map(|d| {
             w::GpuRenderPassDepthStencilAttachment {
-                view: &d.view.as_custom::<TextureView>().expect("texture view").view,
+                view: &d
+                    .view
+                    .as_custom::<TextureView>()
+                    .expect("texture view")
+                    .view,
                 depth_clear_value: d.depth_ops.as_ref().and_then(|o| match o.load {
                     wgt::LoadOp::Clear(v) => Some(v),
                     _ => None,
@@ -982,11 +1074,14 @@ impl CommandEncoderInterface for CommandEncoder {
                 stencil_read_only: Some(d.stencil_ops.is_none()),
             }
         });
-        let timestamp_writes = desc.timestamp_writes.as_ref().map(|t| w::GpuRenderPassTimestampWrites {
-            query_set: &t.query_set.as_custom::<QuerySet>().expect("query set").set,
-            beginning_of_pass_write_index: t.beginning_of_pass_write_index,
-            end_of_pass_write_index: t.end_of_pass_write_index,
-        });
+        let timestamp_writes =
+            desc.timestamp_writes
+                .as_ref()
+                .map(|t| w::GpuRenderPassTimestampWrites {
+                    query_set: &t.query_set.as_custom::<QuerySet>().expect("query set").set,
+                    beginning_of_pass_write_index: t.beginning_of_pass_write_index,
+                    end_of_pass_write_index: t.end_of_pass_write_index,
+                });
         let occlusion_query_set = desc
             .occlusion_query_set
             .map(|q| &q.as_custom::<QuerySet>().expect("query set").set);
@@ -1007,11 +1102,20 @@ impl CommandEncoderInterface for CommandEncoder {
         })
     }
 
-    fn clear_texture(&self, _texture: &DispatchTexture, _subresource_range: &wgt::ImageSubresourceRange) {
+    fn clear_texture(
+        &self,
+        _texture: &DispatchTexture,
+        _subresource_range: &wgt::ImageSubresourceRange,
+    ) {
         todo!("wasi:webgpu 0.0.1 has no clear-texture")
     }
 
-    fn clear_buffer(&self, buffer: &DispatchBuffer, offset: wgt::BufferAddress, size: Option<wgt::BufferAddress>) {
+    fn clear_buffer(
+        &self,
+        buffer: &DispatchBuffer,
+        offset: wgt::BufferAddress,
+        size: Option<wgt::BufferAddress>,
+    ) {
         let b: &Buffer = custom!(buffer, Buffer);
         self.encoder.clear_buffer(&b.buffer, Some(offset), size);
     }
@@ -1043,8 +1147,13 @@ impl CommandEncoderInterface for CommandEncoder {
     ) {
         let q: &QuerySet = custom!(query_set, QuerySet);
         let b: &Buffer = custom!(destination, Buffer);
-        self.encoder
-            .resolve_query_set(&q.set, first_query, query_count, &b.buffer, destination_offset);
+        self.encoder.resolve_query_set(
+            &q.set,
+            first_query,
+            query_count,
+            &b.buffer,
+            destination_offset,
+        );
     }
 
     fn mark_acceleration_structures_built<'a>(
@@ -1091,7 +1200,12 @@ impl ComputePassInterface for ComputePass {
         self.pass.set_pipeline(&p.pipeline);
     }
 
-    fn set_bind_group(&mut self, index: u32, bind_group: Option<&DispatchBindGroup>, offsets: &[wgt::DynamicOffset]) {
+    fn set_bind_group(
+        &mut self,
+        index: u32,
+        bind_group: Option<&DispatchBindGroup>,
+        offsets: &[wgt::DynamicOffset],
+    ) {
         let group = bind_group.map(|g| &custom!(g, BindGroup).group);
         let offsets = (!offsets.is_empty()).then_some(offsets);
         self.pass
@@ -1119,7 +1233,11 @@ impl ComputePassInterface for ComputePass {
         todo!("wasi:webgpu: timestamps inside passes")
     }
 
-    fn begin_pipeline_statistics_query(&mut self, _query_set: &DispatchQuerySet, _query_index: u32) {
+    fn begin_pipeline_statistics_query(
+        &mut self,
+        _query_set: &DispatchQuerySet,
+        _query_index: u32,
+    ) {
         todo!("wasi:webgpu: pipeline statistics")
     }
 
@@ -1131,9 +1249,14 @@ impl ComputePassInterface for ComputePass {
         self.pass.dispatch_workgroups(x, Some(y), Some(z));
     }
 
-    fn dispatch_workgroups_indirect(&mut self, indirect_buffer: &DispatchBuffer, indirect_offset: wgt::BufferAddress) {
+    fn dispatch_workgroups_indirect(
+        &mut self,
+        indirect_buffer: &DispatchBuffer,
+        indirect_offset: wgt::BufferAddress,
+    ) {
         let b: &Buffer = custom!(indirect_buffer, Buffer);
-        self.pass.dispatch_workgroups_indirect(&b.buffer, indirect_offset);
+        self.pass
+            .dispatch_workgroups_indirect(&b.buffer, indirect_offset);
     }
 }
 
@@ -1156,7 +1279,12 @@ impl RenderPassInterface for RenderPass {
         self.pass.set_pipeline(&p.pipeline);
     }
 
-    fn set_bind_group(&mut self, index: u32, bind_group: Option<&DispatchBindGroup>, offsets: &[wgt::DynamicOffset]) {
+    fn set_bind_group(
+        &mut self,
+        index: u32,
+        bind_group: Option<&DispatchBindGroup>,
+        offsets: &[wgt::DynamicOffset],
+    ) {
         let group = bind_group.map(|g| &custom!(g, BindGroup).group);
         let offsets = (!offsets.is_empty()).then_some(offsets);
         self.pass
@@ -1172,11 +1300,21 @@ impl RenderPassInterface for RenderPass {
         size: Option<wgt::BufferSize>,
     ) {
         let b: &Buffer = custom!(buffer, Buffer);
-        self.pass
-            .set_index_buffer(&b.buffer, conv::index_format(index_format), Some(offset), size.map(|s| s.get()));
+        self.pass.set_index_buffer(
+            &b.buffer,
+            conv::index_format(index_format),
+            Some(offset),
+            size.map(|s| s.get()),
+        );
     }
 
-    fn set_vertex_buffer(&mut self, slot: u32, buffer: &DispatchBuffer, offset: wgt::BufferAddress, size: Option<wgt::BufferSize>) {
+    fn set_vertex_buffer(
+        &mut self,
+        slot: u32,
+        buffer: &DispatchBuffer,
+        offset: wgt::BufferAddress,
+        size: Option<wgt::BufferSize>,
+    ) {
         let b: &Buffer = custom!(buffer, Buffer);
         self.pass
             .set_vertex_buffer(slot, Some(&b.buffer), Some(offset), size.map(|s| s.get()));
@@ -1194,8 +1332,17 @@ impl RenderPassInterface for RenderPass {
         self.pass.set_scissor_rect(x, y, width, height);
     }
 
-    fn set_viewport(&mut self, x: f32, y: f32, width: f32, height: f32, min_depth: f32, max_depth: f32) {
-        self.pass.set_viewport(x, y, width, height, min_depth, max_depth);
+    fn set_viewport(
+        &mut self,
+        x: f32,
+        y: f32,
+        width: f32,
+        height: f32,
+        min_depth: f32,
+        max_depth: f32,
+    ) {
+        self.pass
+            .set_viewport(x, y, width, height, min_depth, max_depth);
     }
 
     fn set_stencil_reference(&mut self, reference: u32) {
@@ -1225,25 +1372,47 @@ impl RenderPassInterface for RenderPass {
         todo!("wasi:webgpu: mesh shaders")
     }
 
-    fn draw_indirect(&mut self, indirect_buffer: &DispatchBuffer, indirect_offset: wgt::BufferAddress) {
+    fn draw_indirect(
+        &mut self,
+        indirect_buffer: &DispatchBuffer,
+        indirect_offset: wgt::BufferAddress,
+    ) {
         let b: &Buffer = custom!(indirect_buffer, Buffer);
         self.pass.draw_indirect(&b.buffer, indirect_offset);
     }
 
-    fn draw_indexed_indirect(&mut self, indirect_buffer: &DispatchBuffer, indirect_offset: wgt::BufferAddress) {
+    fn draw_indexed_indirect(
+        &mut self,
+        indirect_buffer: &DispatchBuffer,
+        indirect_offset: wgt::BufferAddress,
+    ) {
         let b: &Buffer = custom!(indirect_buffer, Buffer);
         self.pass.draw_indexed_indirect(&b.buffer, indirect_offset);
     }
 
-    fn draw_mesh_tasks_indirect(&mut self, _indirect_buffer: &DispatchBuffer, _indirect_offset: wgt::BufferAddress) {
+    fn draw_mesh_tasks_indirect(
+        &mut self,
+        _indirect_buffer: &DispatchBuffer,
+        _indirect_offset: wgt::BufferAddress,
+    ) {
         todo!("wasi:webgpu: mesh shaders")
     }
 
-    fn multi_draw_indirect(&mut self, _indirect_buffer: &DispatchBuffer, _indirect_offset: wgt::BufferAddress, _count: u32) {
+    fn multi_draw_indirect(
+        &mut self,
+        _indirect_buffer: &DispatchBuffer,
+        _indirect_offset: wgt::BufferAddress,
+        _count: u32,
+    ) {
         todo!("wasi:webgpu: multi-draw")
     }
 
-    fn multi_draw_indexed_indirect(&mut self, _indirect_buffer: &DispatchBuffer, _indirect_offset: wgt::BufferAddress, _count: u32) {
+    fn multi_draw_indexed_indirect(
+        &mut self,
+        _indirect_buffer: &DispatchBuffer,
+        _indirect_offset: wgt::BufferAddress,
+        _count: u32,
+    ) {
         todo!("wasi:webgpu: multi-draw")
     }
 
@@ -1258,7 +1427,12 @@ impl RenderPassInterface for RenderPass {
         todo!("wasi:webgpu: multi-draw")
     }
 
-    fn multi_draw_mesh_tasks_indirect(&mut self, _indirect_buffer: &DispatchBuffer, _indirect_offset: wgt::BufferAddress, _count: u32) {
+    fn multi_draw_mesh_tasks_indirect(
+        &mut self,
+        _indirect_buffer: &DispatchBuffer,
+        _indirect_offset: wgt::BufferAddress,
+        _count: u32,
+    ) {
         todo!("wasi:webgpu: mesh shaders")
     }
 
@@ -1308,7 +1482,11 @@ impl RenderPassInterface for RenderPass {
         self.pass.end_occlusion_query();
     }
 
-    fn begin_pipeline_statistics_query(&mut self, _query_set: &DispatchQuerySet, _query_index: u32) {
+    fn begin_pipeline_statistics_query(
+        &mut self,
+        _query_set: &DispatchQuerySet,
+        _query_index: u32,
+    ) {
         todo!("wasi:webgpu: pipeline statistics")
     }
 
@@ -1316,7 +1494,10 @@ impl RenderPassInterface for RenderPass {
         todo!("wasi:webgpu: pipeline statistics")
     }
 
-    fn execute_bundles(&mut self, _render_bundles: &mut dyn Iterator<Item = &DispatchRenderBundle>) {
+    fn execute_bundles(
+        &mut self,
+        _render_bundles: &mut dyn Iterator<Item = &DispatchRenderBundle>,
+    ) {
         todo!("wasi:webgpu: render bundles")
     }
 }

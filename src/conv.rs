@@ -151,7 +151,9 @@ pub fn buffer_binding_type(t: wgt::BufferBindingType) -> w::GpuBufferBindingType
     match t {
         wgt::BufferBindingType::Uniform => w::GpuBufferBindingType::Uniform,
         wgt::BufferBindingType::Storage { read_only: false } => w::GpuBufferBindingType::Storage,
-        wgt::BufferBindingType::Storage { read_only: true } => w::GpuBufferBindingType::ReadOnlyStorage,
+        wgt::BufferBindingType::Storage { read_only: true } => {
+            w::GpuBufferBindingType::ReadOnlyStorage
+        }
     }
 }
 
@@ -166,7 +168,9 @@ pub fn sampler_binding_type(t: wgt::SamplerBindingType) -> w::GpuSamplerBindingT
 pub fn sample_type(t: wgt::TextureSampleType) -> w::GpuTextureSampleType {
     match t {
         wgt::TextureSampleType::Float { filterable: true } => w::GpuTextureSampleType::Float,
-        wgt::TextureSampleType::Float { filterable: false } => w::GpuTextureSampleType::UnfilterableFloat,
+        wgt::TextureSampleType::Float { filterable: false } => {
+            w::GpuTextureSampleType::UnfilterableFloat
+        }
         wgt::TextureSampleType::Depth => w::GpuTextureSampleType::Depth,
         wgt::TextureSampleType::Sint => w::GpuTextureSampleType::Sint,
         wgt::TextureSampleType::Uint => w::GpuTextureSampleType::Uint,
@@ -467,15 +471,36 @@ pub fn buffer_layout(l: wgt::TexelCopyBufferLayout) -> w::GpuTexelCopyBufferLayo
 /// The features the wit can name, by wgpu's flag.
 pub const FEATURES: &[(&str, wgt::Features)] = &[
     ("depth-clip-control", wgt::Features::DEPTH_CLIP_CONTROL),
-    ("depth32float-stencil8", wgt::Features::DEPTH32FLOAT_STENCIL8),
-    ("texture-compression-bc", wgt::Features::TEXTURE_COMPRESSION_BC),
-    ("texture-compression-bc-sliced3d", wgt::Features::TEXTURE_COMPRESSION_BC_SLICED_3D),
-    ("texture-compression-etc2", wgt::Features::TEXTURE_COMPRESSION_ETC2),
-    ("texture-compression-astc", wgt::Features::TEXTURE_COMPRESSION_ASTC),
+    (
+        "depth32float-stencil8",
+        wgt::Features::DEPTH32FLOAT_STENCIL8,
+    ),
+    (
+        "texture-compression-bc",
+        wgt::Features::TEXTURE_COMPRESSION_BC,
+    ),
+    (
+        "texture-compression-bc-sliced3d",
+        wgt::Features::TEXTURE_COMPRESSION_BC_SLICED_3D,
+    ),
+    (
+        "texture-compression-etc2",
+        wgt::Features::TEXTURE_COMPRESSION_ETC2,
+    ),
+    (
+        "texture-compression-astc",
+        wgt::Features::TEXTURE_COMPRESSION_ASTC,
+    ),
     ("timestamp-query", wgt::Features::TIMESTAMP_QUERY),
-    ("indirect-first-instance", wgt::Features::INDIRECT_FIRST_INSTANCE),
+    (
+        "indirect-first-instance",
+        wgt::Features::INDIRECT_FIRST_INSTANCE,
+    ),
     ("shader-f16", wgt::Features::SHADER_F16),
-    ("rg11b10ufloat-renderable", wgt::Features::RG11B10UFLOAT_RENDERABLE),
+    (
+        "rg11b10ufloat-renderable",
+        wgt::Features::RG11B10UFLOAT_RENDERABLE,
+    ),
     ("bgra8unorm-storage", wgt::Features::BGRA8UNORM_STORAGE),
     ("float32-filterable", wgt::Features::FLOAT32_FILTERABLE),
     ("float32-blendable", wgt::Features::FLOAT32_BLENDABLE),
@@ -530,8 +555,10 @@ pub fn limits(l: &w::GpuSupportedLimits) -> wgt::Limits {
         max_texture_array_layers: l.max_texture_array_layers(),
         max_bind_groups: l.max_bind_groups(),
         max_bindings_per_bind_group: l.max_bindings_per_bind_group(),
-        max_dynamic_uniform_buffers_per_pipeline_layout: l.max_dynamic_uniform_buffers_per_pipeline_layout(),
-        max_dynamic_storage_buffers_per_pipeline_layout: l.max_dynamic_storage_buffers_per_pipeline_layout(),
+        max_dynamic_uniform_buffers_per_pipeline_layout: l
+            .max_dynamic_uniform_buffers_per_pipeline_layout(),
+        max_dynamic_storage_buffers_per_pipeline_layout: l
+            .max_dynamic_storage_buffers_per_pipeline_layout(),
         max_sampled_textures_per_shader_stage: l.max_sampled_textures_per_shader_stage(),
         max_samplers_per_shader_stage: l.max_samplers_per_shader_stage(),
         max_storage_buffers_per_shader_stage: l.max_storage_buffers_per_shader_stage(),
@@ -568,29 +595,86 @@ pub fn required_limits(l: &wgt::Limits) -> w::RecordOptionGpuSize64 {
         ("maxTextureDimension3D", l.max_texture_dimension_3d as u64),
         ("maxTextureArrayLayers", l.max_texture_array_layers as u64),
         ("maxBindGroups", l.max_bind_groups as u64),
-        ("maxBindingsPerBindGroup", l.max_bindings_per_bind_group as u64),
-        ("maxDynamicUniformBuffersPerPipelineLayout", l.max_dynamic_uniform_buffers_per_pipeline_layout as u64),
-        ("maxDynamicStorageBuffersPerPipelineLayout", l.max_dynamic_storage_buffers_per_pipeline_layout as u64),
-        ("maxSampledTexturesPerShaderStage", l.max_sampled_textures_per_shader_stage as u64),
-        ("maxSamplersPerShaderStage", l.max_samplers_per_shader_stage as u64),
-        ("maxStorageBuffersPerShaderStage", l.max_storage_buffers_per_shader_stage as u64),
-        ("maxStorageTexturesPerShaderStage", l.max_storage_textures_per_shader_stage as u64),
-        ("maxUniformBuffersPerShaderStage", l.max_uniform_buffers_per_shader_stage as u64),
-        ("maxUniformBufferBindingSize", l.max_uniform_buffer_binding_size),
-        ("maxStorageBufferBindingSize", l.max_storage_buffer_binding_size),
-        ("minUniformBufferOffsetAlignment", l.min_uniform_buffer_offset_alignment as u64),
-        ("minStorageBufferOffsetAlignment", l.min_storage_buffer_offset_alignment as u64),
+        (
+            "maxBindingsPerBindGroup",
+            l.max_bindings_per_bind_group as u64,
+        ),
+        (
+            "maxDynamicUniformBuffersPerPipelineLayout",
+            l.max_dynamic_uniform_buffers_per_pipeline_layout as u64,
+        ),
+        (
+            "maxDynamicStorageBuffersPerPipelineLayout",
+            l.max_dynamic_storage_buffers_per_pipeline_layout as u64,
+        ),
+        (
+            "maxSampledTexturesPerShaderStage",
+            l.max_sampled_textures_per_shader_stage as u64,
+        ),
+        (
+            "maxSamplersPerShaderStage",
+            l.max_samplers_per_shader_stage as u64,
+        ),
+        (
+            "maxStorageBuffersPerShaderStage",
+            l.max_storage_buffers_per_shader_stage as u64,
+        ),
+        (
+            "maxStorageTexturesPerShaderStage",
+            l.max_storage_textures_per_shader_stage as u64,
+        ),
+        (
+            "maxUniformBuffersPerShaderStage",
+            l.max_uniform_buffers_per_shader_stage as u64,
+        ),
+        (
+            "maxUniformBufferBindingSize",
+            l.max_uniform_buffer_binding_size,
+        ),
+        (
+            "maxStorageBufferBindingSize",
+            l.max_storage_buffer_binding_size,
+        ),
+        (
+            "minUniformBufferOffsetAlignment",
+            l.min_uniform_buffer_offset_alignment as u64,
+        ),
+        (
+            "minStorageBufferOffsetAlignment",
+            l.min_storage_buffer_offset_alignment as u64,
+        ),
         ("maxVertexBuffers", l.max_vertex_buffers as u64),
         ("maxBufferSize", l.max_buffer_size),
         ("maxVertexAttributes", l.max_vertex_attributes as u64),
-        ("maxVertexBufferArrayStride", l.max_vertex_buffer_array_stride as u64),
-        ("maxInterStageShaderVariables", l.max_inter_stage_shader_variables as u64),
+        (
+            "maxVertexBufferArrayStride",
+            l.max_vertex_buffer_array_stride as u64,
+        ),
+        (
+            "maxInterStageShaderVariables",
+            l.max_inter_stage_shader_variables as u64,
+        ),
         ("maxColorAttachments", l.max_color_attachments as u64),
-        ("maxColorAttachmentBytesPerSample", l.max_color_attachment_bytes_per_sample as u64),
-        ("maxComputeWorkgroupStorageSize", l.max_compute_workgroup_storage_size as u64),
-        ("maxComputeInvocationsPerWorkgroup", l.max_compute_invocations_per_workgroup as u64),
-        ("maxComputeWorkgroupSizeX", l.max_compute_workgroup_size_x as u64),
-        ("maxComputeWorkgroupsPerDimension", l.max_compute_workgroups_per_dimension as u64),
+        (
+            "maxColorAttachmentBytesPerSample",
+            l.max_color_attachment_bytes_per_sample as u64,
+        ),
+        (
+            "maxComputeWorkgroupStorageSize",
+            l.max_compute_workgroup_storage_size as u64,
+        ),
+        (
+            "maxComputeInvocationsPerWorkgroup",
+            l.max_compute_invocations_per_workgroup as u64,
+        ),
+        (
+            "maxComputeWorkgroupSizeX",
+            l.max_compute_workgroup_size_x as u64,
+        ),
+        (
+            "maxComputeWorkgroupsPerDimension",
+            l.max_compute_workgroups_per_dimension as u64,
+        ),
     ];
     for (k, v) in pairs {
         r.add(k, Some(v));
