@@ -13,6 +13,12 @@
 //! The bytes that cross the wit are counted: `wit_bytes()` reads the
 //! totals, `take_wit_bytes()` reads and clears them.
 //!
+//! A texture can cross between the module and the host as a wit resource:
+//! `texture_from_host` wraps a `gpu-texture` the host handed over as a
+//! `wgpu::Texture`, and `host_texture` takes the resource out of a
+//! `wgpu::Texture` the module made, to hand it over. `wasi` is the bindings
+//! the crate imports, for a module's own world to map onto.
+//!
 //! On any target but wasm32 the crate is the counters alone, so a workspace
 //! that holds it builds natively.
 
@@ -88,11 +94,75 @@ mod backend;
 mod conv;
 
 #[cfg(target_arch = "wasm32")]
-pub use backend::instance;
+pub use backend::{host_texture, instance, texture_from_host};
+
+/// The wit bindings the crate imports. A module that binds a world of its
+/// own naming `wasi:webgpu` (one that hands textures to and from the host)
+/// maps these interfaces onto it with wit-bindgen's `with`, so that its
+/// `gpu-texture` is this crate's and `texture_from_host` and
+/// `host_texture` take and give it:
+///
+/// ```ignore
+/// with: {
+///     "wasi:webgpu/webgpu@0.0.1": wgpu_wasi_webgpu::wasi::webgpu::webgpu,
+///     "wasi:graphics-context/graphics-context@0.0.1": wgpu_wasi_webgpu::wasi::graphics_context::graphics_context,
+///     "wasi:io/poll@0.2.0": wgpu_wasi_webgpu::wasi::io::poll,
+/// },
+/// ```
+#[cfg(target_arch = "wasm32")]
+pub use bindings::wasi;
+
+/// What `texture_from_host` says a host's texture is: 2D, `width` x
+/// `height`, one level and one sample, in `format`, and readable only
+/// (`TEXTURE_BINDING` and `COPY_SRC`), as a frame the host lends a module
+/// for one call is.
+pub fn host_descriptor(
+    width: u32,
+    height: u32,
+    format: wgpu::TextureFormat,
+) -> wgpu::TextureDescriptor<'static> {
+    wgpu::TextureDescriptor {
+        label: None,
+        size: wgpu::Extent3d {
+            width,
+            height,
+            depth_or_array_layers: 1,
+        },
+        mip_level_count: 1,
+        sample_count: 1,
+        dimension: wgpu::TextureDimension::D2,
+        format,
+        usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_SRC,
+        view_formats: &[],
+    }
+}
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_host_texture_is_described_as_readable_and_its_own_size() {
+        let d = host_descriptor(1920, 1080, wgpu::TextureFormat::R8Unorm);
+        assert_eq!(
+            d.size,
+            wgpu::Extent3d {
+                width: 1920,
+                height: 1080,
+                depth_or_array_layers: 1
+            }
+        );
+        assert_eq!(d.format, wgpu::TextureFormat::R8Unorm);
+        assert_eq!((d.mip_level_count, d.sample_count), (1, 1));
+        assert_eq!(d.dimension, wgpu::TextureDimension::D2);
+        assert_eq!(
+            d.usage,
+            wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_SRC
+        );
+        assert!(!d.usage.contains(wgpu::TextureUsages::RENDER_ATTACHMENT));
+        assert!(!d.usage.contains(wgpu::TextureUsages::COPY_DST));
+        assert!(d.view_formats.is_empty());
+    }
 
     #[test]
     fn counters_add_up_and_take_clears_them() {

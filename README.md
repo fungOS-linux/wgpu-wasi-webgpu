@@ -7,8 +7,9 @@ a renderer such as vello_hybrid or a compute kernel, builds for
 `wgpu_wasi_webgpu::instance()` is a `wgpu::Instance` whose adapter is the
 host's GPU, and every call below it is a wit import the host answers.
 
-On any target but wasm32 the crate holds only its byte counters, so a
-workspace that depends on it still builds and tests natively.
+On any target but wasm32 the crate holds only its byte counters and
+`host_descriptor`, so a workspace that depends on it still builds and
+tests natively.
 
 ## Using it
 
@@ -39,6 +40,43 @@ The host answers every call synchronously, so each future the crate hands
 back is already complete: `pollster::block_on` returns at once, a
 `map_async` callback has run before `map_async` returns, and `device.poll`
 has nothing left to wait for.
+
+## Textures the host hands over
+
+A module that reads its frames as textures of the host's device, and
+hands frames back as textures (ffrwd's `ffrwd:gpu` interface does both),
+binds a world of its own that names `wasi:webgpu`. Mapping that interface
+onto this crate's bindings with wit-bindgen's `with` makes its
+`gpu-texture` this crate's type:
+
+```rust
+wit_bindgen::generate!({
+    path: "wit",
+    world: "ffrwd:gpu/gpu-module@0.1.0",
+    with: {
+        "wasi:webgpu/webgpu@0.0.1": wgpu_wasi_webgpu::wasi::webgpu::webgpu,
+        "wasi:graphics-context/graphics-context@0.0.1": wgpu_wasi_webgpu::wasi::graphics_context::graphics_context,
+        "wasi:io/poll@0.2.0": wgpu_wasi_webgpu::wasi::io::poll,
+    },
+});
+```
+
+Two functions cross between the resource and wgpu:
+
+- `texture_from_host(texture, width, height, format)` wraps a
+  `gpu-texture` the host handed over as a `wgpu::Texture` of the module's
+  device, described by `host_descriptor`: 2D, one level, one sample, the
+  size and format given (which must be the host's), and readable only
+  (`TEXTURE_BINDING` and `COPY_SRC`). A module samples it, copies from it,
+  or binds a view of it like any other texture. Dropping it drops the
+  resource handle; the host's texture is the host's.
+- `host_texture(texture)` takes the `gpu-texture` out of a `wgpu::Texture`
+  the module made, for a wit function that takes ownership of one. The
+  handle is spent: the `wgpu::Texture`, its clones and its views are
+  not to be used in commands again, and dropping them calls nothing on the
+  host. Handing the same texture over twice panics.
+
+Neither copies anything: the texture stays where it is on the device.
 
 ## Scope
 

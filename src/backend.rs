@@ -43,6 +43,42 @@ macro_rules! custom {
     };
 }
 
+/// A texture the host handed over as a wit resource, as a `wgpu::Texture`
+/// of the module's device: `width` x `height` in `format`, which is what
+/// the host says it is, and readable only (see `host_descriptor`). Dropping
+/// it drops the resource handle and nothing of the host's.
+pub fn texture_from_host(
+    texture: w::GpuTexture,
+    width: u32,
+    height: u32,
+    format: wgt::TextureFormat,
+) -> wgpu::Texture {
+    wgpu::Texture::from_custom(
+        Texture {
+            texture: Rc::new(texture),
+        },
+        &crate::host_descriptor(width, height, format),
+    )
+}
+
+/// The wit resource behind `texture`, a texture this backend made, taken
+/// out of it to be handed to the host, which takes ownership. The handle is
+/// spent: `texture` and every clone and view of it must not be used in
+/// commands again, and dropping them calls nothing on the host.
+///
+/// Panics if `texture` is not this backend's, or was handed over before.
+pub fn host_texture(texture: wgpu::Texture) -> w::GpuTexture {
+    let ours: &Texture = custom!(texture, Texture);
+    let handle = ours.texture.take_handle();
+    assert!(
+        handle != u32::MAX,
+        "wasi:webgpu: host_texture: the texture was handed to the host already"
+    );
+    // SAFETY: `take_handle` left the resource holding no handle, so this is
+    // the only owner of it.
+    unsafe { w::GpuTexture::from_handle(handle) }
+}
+
 /// A trait method the wasi:webgpu 0.0.1 interface has no function for, and
 /// whose signature has no error to return.
 #[track_caller]
