@@ -1,0 +1,28 @@
+[workspace]
+# Value modules that drive wgpu through wgpu-wasi-webgpu, built for
+# wasm32-wasip2 and run under ffrwd-wasm by the crate's tests/gpu.rs.
+# `scene` is the vello scene the vello-scenes module draws, shared with the
+# native render the test compares it against.
+members = ["hello-compute", "hello-triangle", "vello-scenes", "scene"]
+resolver = "3"
+
+[workspace.package]
+version = "0.0.0"
+edition = "2024"
+license = "MIT"
+publish = false
+
+[workspace.dependencies]
+wgpu-wasi-webgpu = { path = "../.." }
+wgpu = { version = "29", default-features = false, features = ["wgsl"] }
+wit-bindgen = "0.57.1"
+serde_json = "1"
+pollster = "0.4"
+sha2 = "0.10"
+png = "0.18"
+base64 = "0.22"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1

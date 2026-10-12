@@ -20,3 +20,12 @@ wgpu = { version = "29", default-features = false, features = ["custom", "wgsl"]
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 wit-bindgen = "0.57.1"
+
+# For tests/gpu.rs, which runs the modules under tests/modules through the
+# ffrwd sidecar and renders the vello scene natively to compare.
+[dev-dependencies]
+scene = { path = "tests/modules/scene" }
+vello_cpu = { version = "0.1", default-features = false, features = ["std", "f32_pipeline"] }
+serde_json = "1"
+base64 = "0.22"
+png = "0.18"

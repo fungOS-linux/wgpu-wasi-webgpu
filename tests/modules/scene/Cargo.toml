@@ -1,0 +1,10 @@
+[package]
+name = "scene"
+description = "The scene vello-scenes renders through wgpu-wasi-webgpu, and the test renders natively to compare."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+vello_common = "0.1"
