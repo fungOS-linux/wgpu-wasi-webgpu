@@ -1,6 +1,6 @@
 [package]
 name = "wgpu-wasi-webgpu"
-version = "29.0.0"
+version = "29.1.0"
 edition = "2024"
 license = "MIT"
 description = "wgpu's custom dispatch traits over wasi:webgpu@0.0.1, so a renderer written against wgpu runs in a wasm32-wasip2 component. Empty on other targets."
