@@ -108,8 +108,22 @@ impl InstanceInterface for Instance {
         conv::wgsl_language_features(&self.gpu.wgsl_language_features())
     }
 
-    fn enumerate_adapters(&self, _backends: wgt::Backends) -> Pin<Box<dyn EnumerateAdapterFuture>> {
-        Box::pin(ready(Vec::new()))
+    fn enumerate_adapters(&self, backends: wgt::Backends) -> Pin<Box<dyn EnumerateAdapterFuture>> {
+        // The host offers one adapter, which reports itself as WebGPU.
+        let adapter = backends
+            .contains(wgt::Backends::BROWSER_WEBGPU)
+            .then(|| self.gpu.request_adapter(None))
+            .flatten();
+        Box::pin(ready(
+            adapter
+                .map(|adapter| {
+                    DispatchAdapter::custom(Adapter {
+                        adapter: Rc::new(adapter),
+                    })
+                })
+                .into_iter()
+                .collect(),
+        ))
     }
 }
 
