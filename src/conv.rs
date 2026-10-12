@@ -2,8 +2,16 @@
 //! shader stages, colour writes, map modes) carry WebGPU's bit values on
 //! both sides, so they pass through as bits.
 
+use std::fmt;
+
 use crate::bindings::wasi::webgpu::webgpu as w;
 use wgpu::{self as wgt};
+
+/// A value of wgpu's that the wasi:webgpu 0.0.1 interface has no way to say.
+#[track_caller]
+fn inexpressible(what: impl fmt::Debug) -> ! {
+    panic!("wasi:webgpu: {what:?}: the wasi:webgpu 0.0.1 interface has no equivalent")
+}
 
 pub fn texture_format(f: wgt::TextureFormat) -> w::GpuTextureFormat {
     use w::GpuTextureFormat as W;
@@ -52,7 +60,72 @@ pub fn texture_format(f: wgt::TextureFormat) -> w::GpuTextureFormat {
         F::Depth24PlusStencil8 => W::Depth24plusStencil8,
         F::Depth32Float => W::Depth32float,
         F::Depth32FloatStencil8 => W::Depth32floatStencil8,
-        other => todo!("wasi:webgpu: texture format {other:?}"),
+        F::Bc1RgbaUnorm => W::Bc1RgbaUnorm,
+        F::Bc1RgbaUnormSrgb => W::Bc1RgbaUnormSrgb,
+        F::Bc2RgbaUnorm => W::Bc2RgbaUnorm,
+        F::Bc2RgbaUnormSrgb => W::Bc2RgbaUnormSrgb,
+        F::Bc3RgbaUnorm => W::Bc3RgbaUnorm,
+        F::Bc3RgbaUnormSrgb => W::Bc3RgbaUnormSrgb,
+        F::Bc4RUnorm => W::Bc4RUnorm,
+        F::Bc4RSnorm => W::Bc4RSnorm,
+        F::Bc5RgUnorm => W::Bc5RgUnorm,
+        F::Bc5RgSnorm => W::Bc5RgSnorm,
+        F::Bc6hRgbUfloat => W::Bc6hRgbUfloat,
+        F::Bc6hRgbFloat => W::Bc6hRgbFloat,
+        F::Bc7RgbaUnorm => W::Bc7RgbaUnorm,
+        F::Bc7RgbaUnormSrgb => W::Bc7RgbaUnormSrgb,
+        F::Etc2Rgb8Unorm => W::Etc2Rgb8unorm,
+        F::Etc2Rgb8UnormSrgb => W::Etc2Rgb8unormSrgb,
+        F::Etc2Rgb8A1Unorm => W::Etc2Rgb8a1unorm,
+        F::Etc2Rgb8A1UnormSrgb => W::Etc2Rgb8a1unormSrgb,
+        F::Etc2Rgba8Unorm => W::Etc2Rgba8unorm,
+        F::Etc2Rgba8UnormSrgb => W::Etc2Rgba8unormSrgb,
+        F::EacR11Unorm => W::EacR11unorm,
+        F::EacR11Snorm => W::EacR11snorm,
+        F::EacRg11Unorm => W::EacRg11unorm,
+        F::EacRg11Snorm => W::EacRg11snorm,
+        F::Astc { block, channel } => astc_format(block, channel),
+        // The 16-bit normalized formats, the 64-bit integer one and the
+        // multi-planar video formats are wgpu extensions WebGPU lacks.
+        other => inexpressible(other),
+    }
+}
+
+fn astc_format(block: wgt::AstcBlock, channel: wgt::AstcChannel) -> w::GpuTextureFormat {
+    use w::GpuTextureFormat as W;
+    use wgt::AstcBlock as B;
+    use wgt::AstcChannel as C;
+    match (block, channel) {
+        (B::B4x4, C::Unorm) => W::Astc4x4Unorm,
+        (B::B4x4, C::UnormSrgb) => W::Astc4x4UnormSrgb,
+        (B::B5x4, C::Unorm) => W::Astc5x4Unorm,
+        (B::B5x4, C::UnormSrgb) => W::Astc5x4UnormSrgb,
+        (B::B5x5, C::Unorm) => W::Astc5x5Unorm,
+        (B::B5x5, C::UnormSrgb) => W::Astc5x5UnormSrgb,
+        (B::B6x5, C::Unorm) => W::Astc6x5Unorm,
+        (B::B6x5, C::UnormSrgb) => W::Astc6x5UnormSrgb,
+        (B::B6x6, C::Unorm) => W::Astc6x6Unorm,
+        (B::B6x6, C::UnormSrgb) => W::Astc6x6UnormSrgb,
+        (B::B8x5, C::Unorm) => W::Astc8x5Unorm,
+        (B::B8x5, C::UnormSrgb) => W::Astc8x5UnormSrgb,
+        (B::B8x6, C::Unorm) => W::Astc8x6Unorm,
+        (B::B8x6, C::UnormSrgb) => W::Astc8x6UnormSrgb,
+        (B::B8x8, C::Unorm) => W::Astc8x8Unorm,
+        (B::B8x8, C::UnormSrgb) => W::Astc8x8UnormSrgb,
+        (B::B10x5, C::Unorm) => W::Astc10x5Unorm,
+        (B::B10x5, C::UnormSrgb) => W::Astc10x5UnormSrgb,
+        (B::B10x6, C::Unorm) => W::Astc10x6Unorm,
+        (B::B10x6, C::UnormSrgb) => W::Astc10x6UnormSrgb,
+        (B::B10x8, C::Unorm) => W::Astc10x8Unorm,
+        (B::B10x8, C::UnormSrgb) => W::Astc10x8UnormSrgb,
+        (B::B10x10, C::Unorm) => W::Astc10x10Unorm,
+        (B::B10x10, C::UnormSrgb) => W::Astc10x10UnormSrgb,
+        (B::B12x10, C::Unorm) => W::Astc12x10Unorm,
+        (B::B12x10, C::UnormSrgb) => W::Astc12x10UnormSrgb,
+        (B::B12x12, C::Unorm) => W::Astc12x12Unorm,
+        (B::B12x12, C::UnormSrgb) => W::Astc12x12UnormSrgb,
+        // HDR ASTC is a wgpu extension.
+        other => inexpressible(other),
     }
 }
 
@@ -81,7 +154,8 @@ pub fn aspect(a: wgt::TextureAspect) -> w::GpuTextureAspect {
         wgt::TextureAspect::All => w::GpuTextureAspect::All,
         wgt::TextureAspect::StencilOnly => w::GpuTextureAspect::StencilOnly,
         wgt::TextureAspect::DepthOnly => w::GpuTextureAspect::DepthOnly,
-        other => todo!("wasi:webgpu: texture aspect {other:?}"),
+        // The planes of a multi-planar format.
+        other => inexpressible(other),
     }
 }
 
@@ -115,7 +189,8 @@ pub fn address_mode(m: wgt::AddressMode) -> w::GpuAddressMode {
         wgt::AddressMode::ClampToEdge => w::GpuAddressMode::ClampToEdge,
         wgt::AddressMode::Repeat => w::GpuAddressMode::Repeat,
         wgt::AddressMode::MirrorRepeat => w::GpuAddressMode::MirrorRepeat,
-        other => todo!("wasi:webgpu: address mode {other:?}"),
+        // ClampToBorder, a wgpu extension.
+        other => inexpressible(other),
     }
 }
 
@@ -182,13 +257,14 @@ pub fn storage_access(a: wgt::StorageTextureAccess) -> w::GpuStorageTextureAcces
         wgt::StorageTextureAccess::WriteOnly => w::GpuStorageTextureAccess::WriteOnly,
         wgt::StorageTextureAccess::ReadOnly => w::GpuStorageTextureAccess::ReadOnly,
         wgt::StorageTextureAccess::ReadWrite => w::GpuStorageTextureAccess::ReadWrite,
-        other => todo!("wasi:webgpu: storage texture access {other:?}"),
+        // Atomic, a wgpu extension.
+        other => inexpressible(other),
     }
 }
 
 pub fn layout_entry(e: &wgt::BindGroupLayoutEntry) -> w::GpuBindGroupLayoutEntry {
-    if e.count.is_some() {
-        todo!("wasi:webgpu: binding arrays");
+    if let Some(count) = e.count {
+        inexpressible(format_args!("binding array of {count}"));
     }
     let mut entry = w::GpuBindGroupLayoutEntry {
         binding: e.binding,
@@ -237,7 +313,8 @@ pub fn layout_entry(e: &wgt::BindGroupLayoutEntry) -> w::GpuBindGroupLayoutEntry
                 view_dimension: Some(view_dimension(vd)),
             });
         }
-        other => todo!("wasi:webgpu: binding type {other:?}"),
+        // Acceleration structures and external textures.
+        other => inexpressible(other),
     }
     entry
 }
@@ -411,7 +488,9 @@ pub fn vertex_format(f: wgt::VertexFormat) -> w::GpuVertexFormat {
         V::Sint32x4 => W::Sint32x4,
         V::Unorm10_10_10_2 => W::Unorm1010102,
         V::Unorm8x4Bgra => W::Unorm8x4Bgra,
-        other => todo!("wasi:webgpu: vertex format {other:?}"),
+        // The 64-bit float formats, the single-component 8- and 16-bit
+        // ones WebGPU leaves out, and the other wgpu extensions.
+        other => inexpressible(other),
     }
 }
 
@@ -456,7 +535,8 @@ pub fn query_type(t: wgt::QueryType) -> w::GpuQueryType {
     match t {
         wgt::QueryType::Occlusion => w::GpuQueryType::Occlusion,
         wgt::QueryType::Timestamp => w::GpuQueryType::Timestamp,
-        other => todo!("wasi:webgpu: query type {other:?}"),
+        // Pipeline statistics, which WebGPU removed.
+        other => inexpressible(other),
     }
 }
 
@@ -491,6 +571,10 @@ pub const FEATURES: &[(&str, wgt::Features)] = &[
         "texture-compression-astc",
         wgt::Features::TEXTURE_COMPRESSION_ASTC,
     ),
+    (
+        "texture-compression-astc-sliced3d",
+        wgt::Features::TEXTURE_COMPRESSION_ASTC_SLICED_3D,
+    ),
     ("timestamp-query", wgt::Features::TIMESTAMP_QUERY),
     (
         "indirect-first-instance",
@@ -518,6 +602,7 @@ pub fn feature_name(name: &str) -> Option<w::GpuFeatureName> {
         "texture-compression-bc-sliced3d" => N::TextureCompressionBcSliced3d,
         "texture-compression-etc2" => N::TextureCompressionEtc2,
         "texture-compression-astc" => N::TextureCompressionAstc,
+        "texture-compression-astc-sliced3d" => N::TextureCompressionAstcSliced3d,
         "timestamp-query" => N::TimestampQuery,
         "indirect-first-instance" => N::IndirectFirstInstance,
         "shader-f16" => N::ShaderF16,
@@ -564,8 +649,8 @@ pub fn limits(l: &w::GpuSupportedLimits) -> wgt::Limits {
         max_storage_buffers_per_shader_stage: l.max_storage_buffers_per_shader_stage(),
         max_storage_textures_per_shader_stage: l.max_storage_textures_per_shader_stage(),
         max_uniform_buffers_per_shader_stage: l.max_uniform_buffers_per_shader_stage(),
-        max_uniform_buffer_binding_size: l.max_uniform_buffer_binding_size() as u64,
-        max_storage_buffer_binding_size: l.max_storage_buffer_binding_size() as u64,
+        max_uniform_buffer_binding_size: l.max_uniform_buffer_binding_size(),
+        max_storage_buffer_binding_size: l.max_storage_buffer_binding_size(),
         min_uniform_buffer_offset_alignment: l.min_uniform_buffer_offset_alignment(),
         min_storage_buffer_offset_alignment: l.min_storage_buffer_offset_alignment(),
         max_vertex_buffers: l.max_vertex_buffers(),
@@ -589,7 +674,7 @@ pub fn limits(l: &w::GpuSupportedLimits) -> wgt::Limits {
 /// the host knows, with the values wgpu wants.
 pub fn required_limits(l: &wgt::Limits) -> w::RecordOptionGpuSize64 {
     let r = w::RecordOptionGpuSize64::new();
-    let pairs: [(&str, u64); 28] = [
+    let pairs: [(&str, u64); 30] = [
         ("maxTextureDimension1D", l.max_texture_dimension_1d as u64),
         ("maxTextureDimension2D", l.max_texture_dimension_2d as u64),
         ("maxTextureDimension3D", l.max_texture_dimension_3d as u64),
@@ -672,6 +757,14 @@ pub fn required_limits(l: &wgt::Limits) -> w::RecordOptionGpuSize64 {
             l.max_compute_workgroup_size_x as u64,
         ),
         (
+            "maxComputeWorkgroupSizeY",
+            l.max_compute_workgroup_size_y as u64,
+        ),
+        (
+            "maxComputeWorkgroupSizeZ",
+            l.max_compute_workgroup_size_z as u64,
+        ),
+        (
             "maxComputeWorkgroupsPerDimension",
             l.max_compute_workgroups_per_dimension as u64,
         ),
@@ -680,6 +773,37 @@ pub fn required_limits(l: &wgt::Limits) -> w::RecordOptionGpuSize64 {
         r.add(k, Some(v));
     }
     r
+}
+
+/// The WGSL language extensions wgpu names, by the identifier WGSL gives
+/// them.
+const WGSL_LANGUAGE_FEATURES: &[(&str, wgt::WgslLanguageFeatures)] = &[
+    (
+        "readonly_and_readwrite_storage_textures",
+        wgt::WgslLanguageFeatures::ReadOnlyAndReadWriteStorageTextures,
+    ),
+    (
+        "packed_4x8_integer_dot_product",
+        wgt::WgslLanguageFeatures::Packed4x8IntegerDotProduct,
+    ),
+    (
+        "unrestricted_pointer_parameters",
+        wgt::WgslLanguageFeatures::UnrestrictedPointerParameters,
+    ),
+    (
+        "pointer_composite_access",
+        wgt::WgslLanguageFeatures::PointerCompositeAccess,
+    ),
+];
+
+pub fn wgsl_language_features(f: &w::WgslLanguageFeatures) -> wgt::WgslLanguageFeatures {
+    let mut out = wgt::WgslLanguageFeatures::empty();
+    for (name, flag) in WGSL_LANGUAGE_FEATURES {
+        if f.has(name) {
+            out |= flag.clone();
+        }
+    }
+    out
 }
 
 pub fn adapter_info(i: &w::GpuAdapterInfo) -> wgt::AdapterInfo {

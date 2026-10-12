@@ -1,23 +1,20 @@
 //! wgpu over `wasi:webgpu@0.0.1`: an implementation of wgpu's `custom`
 //! dispatch traits whose every call is a wit import the ffrwd sidecar
-//! answers, so a renderer written against wgpu (vello_hybrid here) runs in a
-//! wasm32-wasip2 module unchanged. `instance()` is the entry: a
-//! `wgpu::Instance` whose adapters are the host's.
+//! answers, so a renderer written against wgpu runs in a wasm32-wasip2
+//! component unchanged. `instance()` is the entry: a `wgpu::Instance` whose
+//! adapters are the host's.
 //!
-//! Scope: what vello_hybrid and the experiment's bench call. Instance,
-//! adapter, device, queue, buffers (with the copy-based mapped ranges the
-//! 0.0.1 wit has), textures and views, samplers, bind groups, pipeline
-//! layouts, shader modules (WGSL), render and compute pipelines, command
-//! encoders, render and compute passes, copies, `write-buffer`,
-//! `write-texture`, `map-async`, submit, `on-submitted-work-done` and query
-//! sets. Render bundles, surfaces, acceleration structures, binding arrays
-//! and pipeline caches are `todo!()`.
+//! Every trait method the 0.0.1 wit can express is a call to it. The rest
+//! (surfaces, acceleration structures, mesh shaders, binding arrays,
+//! pipeline caches, passthrough shaders, immediates, the indirect-count
+//! draws, timestamps and statistics inside passes, `clear_texture`) panic
+//! with the method's name; the README lists them.
 //!
 //! The bytes that cross the wit are counted: `wit_bytes()` reads the
 //! totals, `take_wit_bytes()` reads and clears them.
 //!
-//! On any target but wasm32 the crate is the counters alone, so the
-//! workspace builds natively.
+//! On any target but wasm32 the crate is the counters alone, so a workspace
+//! that holds it builds natively.
 
 /// Bytes that crossed the wit since the counters were last cleared.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -65,10 +62,12 @@ mod counters {
     }
 }
 
+/// The bytes that crossed the wit so far.
 pub fn wit_bytes() -> WitBytes {
     counters::read(false)
 }
 
+/// The bytes that crossed the wit so far, clearing the counters.
 pub fn take_wit_bytes() -> WitBytes {
     counters::read(true)
 }
@@ -90,3 +89,19 @@ mod conv;
 
 #[cfg(target_arch = "wasm32")]
 pub use backend::instance;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn counters_add_up_and_take_clears_them() {
+        take_wit_bytes();
+        counters::up(3);
+        counters::up(4);
+        counters::down(5);
+        assert_eq!(wit_bytes(), WitBytes { up: 7, down: 5 });
+        assert_eq!(take_wit_bytes(), WitBytes { up: 7, down: 5 });
+        assert_eq!(wit_bytes(), WitBytes::default());
+    }
+}
