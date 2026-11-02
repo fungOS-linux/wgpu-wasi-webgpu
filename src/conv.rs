@@ -268,7 +268,7 @@ pub fn layout_entry(e: &wgt::BindGroupLayoutEntry) -> w::GpuBindGroupLayoutEntry
     }
     let mut entry = w::GpuBindGroupLayoutEntry {
         binding: e.binding,
-        visibility: e.visibility.bits(),
+        visibility: w::GpuShaderStage::from_bits_truncate(e.visibility.bits().try_into().unwrap()),
         buffer: None,
         sampler: None,
         texture: None,
@@ -401,7 +401,9 @@ pub fn color_target(t: &wgt::ColorTargetState) -> w::GpuColorTargetState {
             color: blend_component(b.color),
             alpha: blend_component(b.alpha),
         }),
-        write_mask: Some(t.write_mask.bits()),
+        write_mask: Some(w::GpuColorWrite::from_bits_truncate(
+            t.write_mask.bits().try_into().unwrap(),
+        )),
     }
 }
 

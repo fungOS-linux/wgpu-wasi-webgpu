@@ -119,7 +119,7 @@ impl InstanceInterface for Instance {
             force_fallback_adapter: Some(options.force_fallback_adapter),
             xr_compatible: None,
         };
-        let Some(adapter) = self.gpu.request_adapter(Some(&opts)) else {
+        let Some(adapter) = pollster::block_on(self.gpu.request_adapter(Some(opts))) else {
             let none = wgt::Backends::empty();
             let host = wgt::Backends::BROWSER_WEBGPU;
             return Box::pin(ready(Err(wgt::RequestAdapterError::NotFound {
@@ -148,7 +148,7 @@ impl InstanceInterface for Instance {
         // The host offers one adapter, which reports itself as WebGPU.
         let adapter = backends
             .contains(wgt::Backends::BROWSER_WEBGPU)
-            .then(|| self.gpu.request_adapter(None))
+            .then(|| pollster::block_on(self.gpu.request_adapter(None)))
             .flatten();
         Box::pin(ready(
             adapter
@@ -185,7 +185,7 @@ impl AdapterInterface for Adapter {
             default_queue: None,
             label: label(desc.label),
         };
-        let device = match self.adapter.request_device(Some(wit_desc)) {
+        let device = match pollster::block_on(self.adapter.request_device(Some(wit_desc))) {
             Ok(d) => d,
             // wgpu's RequestDeviceError cannot be built outside wgpu.
             Err(e) => panic!("wasi:webgpu: request-device: {:?}: {}", e.kind, e.message),
@@ -400,6 +400,7 @@ impl DeviceInterface for Device {
             .device
             .create_pipeline_layout(&w::GpuPipelineLayoutDescriptor {
                 bind_group_layouts: layouts,
+                immediate_size: None,
                 label: label(desc.label),
             });
         DispatchPipelineLayout::custom(PipelineLayout { layout })
@@ -514,7 +515,7 @@ impl DeviceInterface for Device {
     fn create_buffer(&self, desc: &wgt::BufferDescriptor<'_>) -> DispatchBuffer {
         let buffer = self.device.create_buffer(&w::GpuBufferDescriptor {
             size: desc.size,
-            usage: desc.usage.bits(),
+            usage: w::GpuBufferUsage::from_bits_truncate(desc.usage.bits().try_into().unwrap()),
             mapped_at_creation: Some(desc.mapped_at_creation),
             label: label(desc.label),
         });
@@ -532,13 +533,14 @@ impl DeviceInterface for Device {
             sample_count: Some(desc.sample_count),
             dimension: Some(conv::texture_dimension(desc.dimension)),
             format: conv::texture_format(desc.format),
-            usage: desc.usage.bits(),
+            usage: w::GpuTextureUsage::from_bits_truncate(desc.usage.bits().try_into().unwrap()),
             view_formats: Some(
                 desc.view_formats
                     .iter()
                     .map(|f| conv::texture_format(*f))
                     .collect(),
             ),
+            texture_binding_view_dimension: None,
             label: label(desc.label),
         });
         DispatchTexture::custom(Texture {
@@ -650,7 +652,7 @@ impl DeviceInterface for Device {
     }
 
     fn pop_error_scope(&self, _index: u32) -> Pin<Box<dyn PopErrorScopeFuture>> {
-        let error = match self.device.pop_error_scope() {
+        let error = match pollster::block_on(self.device.pop_error_scope()) {
             Ok(Some(e)) => {
                 let message = e.message();
                 let source = Box::new(Message(message.clone()));
@@ -777,11 +779,12 @@ impl QueueInterface for Queue {
     }
 
     fn get_timestamp_period(&self) -> f32 {
-        self.queue.get_timestamp_period()
+        // The current wasi:webgpu contract has no timestamp-period function.
+        1.0
     }
 
     fn on_submitted_work_done(&self, callback: BoxSubmittedWorkDoneCallback) {
-        self.queue.on_submitted_work_done();
+        pollster::block_on(self.queue.on_submitted_work_done());
         callback();
     }
 
@@ -824,14 +827,16 @@ impl BufferInterface for Buffer {
         range: Range<wgt::BufferAddress>,
         callback: BufferMapCallback,
     ) {
-        let (flags, write) = match mode {
-            wgt::MapMode::Read => (1u32, false),
-            wgt::MapMode::Write => (2u32, true),
+        let (mode, write) = match mode {
+            wgt::MapMode::Read => (w::GpuMapMode::from_bits_truncate(1), false),
+            wgt::MapMode::Write => (w::GpuMapMode::from_bits_truncate(2), true),
         };
         // The host maps synchronously: the callback runs before this returns.
-        let result = self
-            .buffer
-            .map_async(flags, Some(range.start), Some(range.end - range.start));
+        let result = pollster::block_on(self.buffer.map_async(
+            mode,
+            Some(range.start),
+            Some(range.end - range.start),
+        ));
         match result {
             Ok(()) => {
                 self.mapped_for_write.set(write);
@@ -923,12 +928,15 @@ impl TextureInterface for Texture {
         let view = self.texture.create_view(Some(&w::GpuTextureViewDescriptor {
             format: desc.format.map(conv::texture_format),
             dimension: desc.dimension.map(conv::view_dimension),
-            usage: desc.usage.map(|u| u.bits()),
+            usage: desc
+                .usage
+                .map(|u| w::GpuTextureUsage::from_bits_truncate(u.bits().try_into().unwrap())),
             aspect: Some(conv::aspect(desc.aspect)),
             base_mip_level: Some(desc.base_mip_level),
             mip_level_count: desc.mip_level_count,
             base_array_layer: Some(desc.base_array_layer),
             array_layer_count: desc.array_layer_count,
+            swizzle: None,
             label: label(desc.label),
         }));
         DispatchTextureView::custom(TextureView { view })
@@ -970,9 +978,8 @@ pub struct ShaderModule {
 
 impl ShaderModuleInterface for ShaderModule {
     fn get_compilation_info(&self) -> Pin<Box<dyn ShaderCompilationInfoFuture>> {
-        let messages = self
-            .module
-            .get_compilation_info()
+        let info = pollster::block_on(self.module.get_compilation_info());
+        let messages = info
             .messages()
             .iter()
             .map(|m| wgt::CompilationMessage {
@@ -1068,10 +1075,10 @@ impl CommandEncoderInterface for CommandEncoder {
         let size = copy_size.unwrap_or(src.size - source_offset);
         self.encoder.copy_buffer_to_buffer(
             &src.buffer,
-            source_offset,
+            Some(source_offset),
             &dst.buffer,
-            destination_offset,
-            size,
+            Some(destination_offset),
+            Some(size),
         );
     }
 
@@ -1238,8 +1245,9 @@ impl CommandEncoderInterface for CommandEncoder {
     }
 
     fn write_timestamp(&self, query_set: &DispatchQuerySet, query_index: u32) {
-        let q: &QuerySet = custom!(query_set, QuerySet);
-        self.encoder.write_timestamp(&q.set, query_index);
+        let _q: &QuerySet = custom!(query_set, QuerySet);
+        let _ = query_index;
+        absent("CommandEncoder::write_timestamp");
     }
 
     fn resolve_query_set(

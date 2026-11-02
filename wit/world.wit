@@ -1,8 +1,8 @@
-// The imports this crate binds: wasi:webgpu@0.0.1 as the ffrwd sidecar
-// hosts it, from the copy under deps/. A module built with this crate
-// carries this world's imports beside whatever world it exports.
+// The imports this crate binds: wasi:webgpu@0.3.0-rc.2.
+// A module built with this crate carries this world's imports beside whatever
+// world it exports.
 package ffrwd:wgpu-wasi-webgpu;
 
 world guest {
-  import wasi:webgpu/webgpu@0.0.1;
+  import wasi:webgpu/webgpu@0.3.0-rc.2;
 }
