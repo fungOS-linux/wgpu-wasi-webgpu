@@ -17,7 +17,6 @@ name = "wgpu_wasi_webgpu"
 # The crate's major is wgpu's. `custom` exposes the dispatch traits; the
 # default features stay off, `webgpu` among them (see the README).
 wgpu = { version = "29", default-features = false, features = ["custom", "wgsl"] }
-pollster = "0.4"
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 wit-bindgen = "0.57.1"

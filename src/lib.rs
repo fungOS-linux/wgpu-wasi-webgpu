@@ -68,6 +68,22 @@ mod counters {
     }
 }
 
+/// Drive a future to completion without a platform thread park.
+///
+/// The host answers synchronously, so a pending poll is a short host-side
+/// wait. `pollster` uses a Condvar, which panics on wasm32-wasip2.
+pub fn block_on<F: std::future::Future>(future: F) -> F::Output {
+    let mut future = std::pin::pin!(future);
+    let waker = std::task::Waker::noop();
+    let mut context = std::task::Context::from_waker(waker);
+    loop {
+        match future.as_mut().poll(&mut context) {
+            std::task::Poll::Ready(value) => return value,
+            std::task::Poll::Pending => std::hint::spin_loop(),
+        }
+    }
+}
+
 /// The bytes that crossed the wit so far.
 pub fn wit_bytes() -> WitBytes {
     counters::read(false)

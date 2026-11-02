@@ -119,7 +119,7 @@ impl InstanceInterface for Instance {
             force_fallback_adapter: Some(options.force_fallback_adapter),
             xr_compatible: None,
         };
-        let Some(adapter) = pollster::block_on(self.gpu.request_adapter(Some(opts))) else {
+        let Some(adapter) = crate::block_on(self.gpu.request_adapter(Some(opts))) else {
             let none = wgt::Backends::empty();
             let host = wgt::Backends::BROWSER_WEBGPU;
             return Box::pin(ready(Err(wgt::RequestAdapterError::NotFound {
@@ -148,7 +148,7 @@ impl InstanceInterface for Instance {
         // The host offers one adapter, which reports itself as WebGPU.
         let adapter = backends
             .contains(wgt::Backends::BROWSER_WEBGPU)
-            .then(|| pollster::block_on(self.gpu.request_adapter(None)))
+            .then(|| crate::block_on(self.gpu.request_adapter(None)))
             .flatten();
         Box::pin(ready(
             adapter
@@ -185,7 +185,7 @@ impl AdapterInterface for Adapter {
             default_queue: None,
             label: label(desc.label),
         };
-        let device = match pollster::block_on(self.adapter.request_device(Some(wit_desc))) {
+        let device = match crate::block_on(self.adapter.request_device(Some(wit_desc))) {
             Ok(d) => d,
             // wgpu's RequestDeviceError cannot be built outside wgpu.
             Err(e) => panic!("wasi:webgpu: request-device: {:?}: {}", e.kind, e.message),
@@ -652,7 +652,7 @@ impl DeviceInterface for Device {
     }
 
     fn pop_error_scope(&self, _index: u32) -> Pin<Box<dyn PopErrorScopeFuture>> {
-        let error = match pollster::block_on(self.device.pop_error_scope()) {
+        let error = match crate::block_on(self.device.pop_error_scope()) {
             Ok(Some(e)) => {
                 let message = e.message();
                 let source = Box::new(Message(message.clone()));
@@ -784,7 +784,7 @@ impl QueueInterface for Queue {
     }
 
     fn on_submitted_work_done(&self, callback: BoxSubmittedWorkDoneCallback) {
-        pollster::block_on(self.queue.on_submitted_work_done());
+        crate::block_on(self.queue.on_submitted_work_done());
         callback();
     }
 
@@ -832,7 +832,7 @@ impl BufferInterface for Buffer {
             wgt::MapMode::Write => (w::GpuMapMode::from_bits_truncate(2), true),
         };
         // The host maps synchronously: the callback runs before this returns.
-        let result = pollster::block_on(self.buffer.map_async(
+        let result = crate::block_on(self.buffer.map_async(
             mode,
             Some(range.start),
             Some(range.end - range.start),
@@ -978,7 +978,7 @@ pub struct ShaderModule {
 
 impl ShaderModuleInterface for ShaderModule {
     fn get_compilation_info(&self) -> Pin<Box<dyn ShaderCompilationInfoFuture>> {
-        let info = pollster::block_on(self.module.get_compilation_info());
+        let info = crate::block_on(self.module.get_compilation_info());
         let messages = info
             .messages()
             .iter()
