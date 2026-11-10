@@ -424,7 +424,7 @@ impl DeviceInterface for Device {
                 desc.vertex
                     .buffers
                     .iter()
-                    .map(|b| Some(conv::vertex_buffer_layout(b)))
+                    .map(|b| b.as_ref().map(conv::vertex_buffer_layout))
                     .collect(),
             ),
             module: &vertex_module.module,
@@ -744,6 +744,11 @@ impl QueueInterface for Queue {
             .unwrap_or_else(|e| panic!("wasi:webgpu: write-buffer: {}", e.message));
     }
 
+    fn present(&self, _detail: &DispatchSurfaceOutputDetail) {
+        // Surfaces are not implemented in this backend: a Spore renders into a
+        // texture and presents it through `soil:canvas-gpu`, never a swapchain.
+    }
+
     fn write_texture(
         &self,
         texture: wgt::TexelCopyTextureInfo<'_>,
@@ -849,7 +854,10 @@ impl BufferInterface for Buffer {
         }
     }
 
-    fn get_mapped_range(&self, sub_range: Range<wgt::BufferAddress>) -> DispatchBufferMappedRange {
+    fn get_mapped_range(
+        &self,
+        sub_range: Range<wgt::BufferAddress>,
+    ) -> Result<DispatchBufferMappedRange, wgt::MapRangeError> {
         let len = (sub_range.end - sub_range.start) as usize;
         let range = if self.mapped_for_write.get() {
             MappedRange {
@@ -867,7 +875,7 @@ impl BufferInterface for Buffer {
                 write_back: None,
             }
         };
-        DispatchBufferMappedRange::custom(range)
+        Ok(DispatchBufferMappedRange::custom(range))
     }
 
     fn unmap(&self) {
@@ -1028,7 +1036,11 @@ impl ComputePipelineInterface for ComputePipeline {
 pub struct QuerySet {
     set: w::GpuQuerySet,
 }
-impl QuerySetInterface for QuerySet {}
+impl QuerySetInterface for QuerySet {
+    fn destroy(&self) {
+        self.set.destroy();
+    }
+}
 
 pub struct CommandBuffer {
     buffer: w::GpuCommandBuffer,
@@ -1371,6 +1383,16 @@ impl ComputePassInterface for ComputePass {
         self.pass
             .dispatch_workgroups_indirect(&b.buffer, indirect_offset);
     }
+
+    fn transition_resources<'a>(
+        &mut self,
+        _buffer_transitions: &mut dyn Iterator<Item = wgt::BufferTransition<&'a DispatchBuffer>>,
+        _texture_transitions: &mut dyn Iterator<
+            Item = wgt::TextureTransition<&'a DispatchTextureView>,
+        >,
+    ) {
+        // The host tracks state itself.
+    }
 }
 
 pub struct RenderPass {
@@ -1424,13 +1446,17 @@ impl RenderPassInterface for RenderPass {
     fn set_vertex_buffer(
         &mut self,
         slot: u32,
-        buffer: &DispatchBuffer,
+        buffer: Option<&DispatchBuffer>,
         offset: wgt::BufferAddress,
         size: Option<wgt::BufferSize>,
     ) {
-        let b: &Buffer = custom!(buffer, Buffer);
-        self.pass
-            .set_vertex_buffer(slot, Some(&b.buffer), Some(offset), size.map(|s| s.get()));
+        let b = buffer.map(|b| custom!(b, Buffer));
+        self.pass.set_vertex_buffer(
+            slot,
+            b.map(|b| &*b.buffer),
+            Some(offset),
+            size.map(|s| s.get()),
+        );
     }
 
     fn set_immediates(&mut self, _offset: u32, _data: &[u8]) {
@@ -1669,13 +1695,17 @@ impl RenderBundleEncoderInterface for RenderBundleEncoder {
     fn set_vertex_buffer(
         &mut self,
         slot: u32,
-        buffer: &DispatchBuffer,
+        buffer: Option<&DispatchBuffer>,
         offset: wgt::BufferAddress,
         size: Option<wgt::BufferSize>,
     ) {
-        let b: &Buffer = custom!(buffer, Buffer);
-        self.encoder
-            .set_vertex_buffer(slot, Some(&b.buffer), Some(offset), size.map(|s| s.get()));
+        let b = buffer.map(|b| custom!(b, Buffer));
+        self.encoder.set_vertex_buffer(
+            slot,
+            b.map(|b| &*b.buffer),
+            Some(offset),
+            size.map(|s| s.get()),
+        );
     }
 
     fn set_immediates(&mut self, _offset: u32, _data: &[u8]) {
@@ -1725,6 +1755,13 @@ impl RenderBundleEncoderInterface for RenderBundleEncoder {
             label: label(desc.label),
         }));
         DispatchRenderBundle::custom(RenderBundle { bundle })
+    }
+
+    fn finish_boxed(
+        self: Box<Self>,
+        desc: &wgt::RenderBundleDescriptor<'_>,
+    ) -> DispatchRenderBundle {
+        (*self).finish(desc)
     }
 }
 

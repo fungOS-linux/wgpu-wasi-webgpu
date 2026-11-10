@@ -1,9 +1,9 @@
 [package]
 name = "wgpu-wasi-webgpu"
-version = "29.1.0"
+version = "30.0.0"
 edition = "2024"
 license = "MIT"
-description = "wgpu's custom dispatch traits over wasi:webgpu@0.0.1, so a renderer written against wgpu runs in a wasm32-wasip2 component. Empty on other targets."
+description = "wgpu's custom dispatch traits over wasi:webgpu@0.3.0-rc.2, so a renderer written against wgpu runs in a wasm32-wasip2 component. Empty on other targets."
 repository = "https://github.com/imbcmdth/wgpu-wasi-webgpu"
 readme = "README.md"
 keywords = ["wgpu", "webgpu", "wasi", "wasm", "component"]
@@ -16,7 +16,7 @@ name = "wgpu_wasi_webgpu"
 [dependencies]
 # The crate's major is wgpu's. `custom` exposes the dispatch traits; the
 # default features stay off, `webgpu` among them (see the README).
-wgpu = { version = "29", default-features = false, features = ["custom", "wgsl"] }
+wgpu = { version = "30", default-features = false, features = ["custom", "wgsl"] }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 wit-bindgen = "0.57.1"

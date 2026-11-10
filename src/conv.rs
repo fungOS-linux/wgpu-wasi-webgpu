@@ -822,6 +822,8 @@ pub fn adapter_info(i: &w::GpuAdapterInfo) -> wgt::AdapterInfo {
         backend: wgt::Backend::BrowserWebGpu,
         subgroup_min_size: i.subgroup_min_size(),
         subgroup_max_size: i.subgroup_max_size(),
-        transient_saves_memory: false,
+        // The host does not report which limit bucket it applied.
+        limit_bucket: None,
+        transient_saves_memory: None,
     }
 }
